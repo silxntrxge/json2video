@@ -1,5 +1,6 @@
 import json
 from moviepy.editor import *
+from PIL import Image
 
 def generate_video(json_data):
     # Parse the JSON data
@@ -46,3 +47,11 @@ def create_clip(element):
     elif element['type'] == 'audio':
         return AudioFileClip(element['source'])
     return None
+
+# Update the resize function to use the current recommended resampling filter
+def resize_image(image, newsize):
+    return image.resize(newsize, Image.LANCZOS)
+
+# Monkey-patch moviepy's resize function
+import moviepy.video.fx.all as vfx
+vfx.resize = resize_image
