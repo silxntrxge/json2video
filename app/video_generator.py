@@ -30,25 +30,34 @@ def generate_video(json_data):
     return output_path
 
 def create_clip(element):
-    if element['type'] == 'image':
-        clip = ImageClip(element['source']).set_duration(element['duration'])
-        clip = clip.set_position((element.get('x', 0), element.get('y', 0)))
-        if 'animations' in element:
-            for animation in element['animations']:
-                if animation['type'] == 'scale':
-                    clip = clip.resize(lambda t: 1 + (float(animation['end_scale'][:-1]) - 100) / 100 * t / clip.duration)
-        return clip
-    elif element['type'] == 'video':
-        clip = VideoFileClip(element['source'])
-        clip = clip.set_position((element.get('x', 0), element.get('y', 0)))
-        return clip
-    elif element['type'] == 'text':
-        clip = TextClip(element['text'], fontsize=element['font_size'], color=element['fill_color'], font=element['font_family'])
-        clip = clip.set_position((element.get('x', 0), element.get('y', 0)))
-        return clip
-    elif element['type'] == 'audio':
-        return AudioFileClip(element['source'])
-    return None
+    try:
+        if element['type'] == 'image':
+            clip = ImageClip(element['source']).set_duration(element['duration'])
+            clip = clip.set_position((element.get('x', 0), element.get('y', 0)))
+            if 'animations' in element:
+                for animation in element['animations']:
+                    if animation['type'] == 'scale':
+                        clip = clip.resize(lambda t: 1 + (float(animation['end_scale'][:-1]) - 100) / 100 * t / clip.duration)
+            return clip
+        elif element['type'] == 'video':
+            clip = VideoFileClip(element['source'])
+            clip = clip.set_position((element.get('x', 0), element.get('y', 0)))
+            return clip
+        elif element['type'] == 'text':
+            # Convert font_size to integer
+            font_size = int(element['font_size'].split()[0])  # Assuming font_size is like "6 vmin"
+            clip = TextClip(element['text'], fontsize=font_size, color=element['fill_color'], font=element['font_family'])
+            clip = clip.set_position((element.get('x', 0), element.get('y', 0)))
+            return clip
+        elif element['type'] == 'audio':
+            return AudioFileClip(element['source'])
+        else:
+            print(f"Unknown element type: {element['type']}")
+            return None
+    except Exception as e:
+        print(f"Error creating clip for element: {element}")
+        print(f"Error details: {str(e)}")
+        return None
 
 # Update the resize function to use the current recommended resampling filter
 def updated_resize(clip, newsize=None, height=None, width=None, apply_to_mask=True):
