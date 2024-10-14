@@ -1,6 +1,8 @@
 import json
 from moviepy.editor import *
 from PIL import Image
+import moviepy.video.fx.all as vfx
+from moviepy.video.fx.resize import resize
 
 def generate_video(json_data):
     # Parse the JSON data
@@ -49,9 +51,21 @@ def create_clip(element):
     return None
 
 # Update the resize function to use the current recommended resampling filter
-def resize_image(image, newsize):
-    return image.resize(newsize, Image.LANCZOS)
+def updated_resize(clip, newsize=None, height=None, width=None, apply_to_mask=True):
+    if Image.ANTIALIAS:
+        resample = Image.ANTIALIAS
+    else:
+        resample = Image.LANCZOS
+    
+    def resize_image(img):
+        return img.resize(newsize[::-1], resample)
+    
+    return clip.image_transform(resize_image)
 
 # Monkey-patch moviepy's resize function
-import moviepy.video.fx.all as vfx
-vfx.resize = resize_image
+vfx.resize = updated_resize
+resize.resize = updated_resize
+
+# Patch PIL.Image.ANTIALIAS
+if not hasattr(Image, 'ANTIALIAS'):
+    Image.ANTIALIAS = Image.LANCZOS
