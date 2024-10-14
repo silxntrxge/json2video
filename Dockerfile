@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsm6 \
     libxext6 \
-    fonts-poppins \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the current directory contents into the container at /app
