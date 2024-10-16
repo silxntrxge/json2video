@@ -3,3 +3,6 @@ uvicorn
 moviepy
 Pillow
 requests
+numpy
+imageio
+opencv-python
