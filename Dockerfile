@@ -17,6 +17,9 @@ COPY . .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Set Python path
+ENV PYTHONPATH=/app
+
 # Expose the port the app runs on
 EXPOSE 8080
 

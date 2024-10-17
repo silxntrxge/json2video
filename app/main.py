@@ -1,8 +1,8 @@
 from fastapi import FastAPI, BackgroundTasks, Header, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Union
-from video_generator import generate_video
-from webhook_sender import send_webhook
+from .video_generator import generate_video
+from .webhook_sender import send_webhook
 import logging
 import os
 import sys
