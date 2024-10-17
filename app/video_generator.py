@@ -289,17 +289,12 @@ def create_image_clip(element, video_width, video_height):
             # Handle static image (including transparent PNGs)
             img = Image.open(temp_image)
             if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
-                # Image has an alpha channel
                 img = img.convert('RGBA')
-                # Create a mask for transparent pixels
                 mask = np.array(img.split()[-1]) / 255.0
-                # Convert image to RGB for MoviePy
                 img_rgb = img.convert('RGB')
                 img_array = np.array(img_rgb)
-                # Create the clip with the mask
                 clip = ImageClip(img_array).set_mask(ImageClip(mask, ismask=True))
             else:
-                # Image doesn't have transparency
                 img = img.convert("RGB")
                 img_array = np.array(img)
                 clip = ImageClip(img_array)
@@ -310,25 +305,61 @@ def create_image_clip(element, video_width, video_height):
         # Check if width, height, x, and y are specified
         if all(element.get(attr) is None for attr in ['width', 'height', 'x', 'y']):
             # If none are specified, make the image cover the entire video
-            resized_clip = clip.resize(height=video_height)
-            final_x = (video_width - resized_clip.w) // 2  # Center horizontally
-            final_y = 0  # Top of the frame
+            aspect_ratio = clip.w / clip.h
+            video_aspect_ratio = video_width / video_height
+            
+            if aspect_ratio > video_aspect_ratio:
+                # Image is wider, fit to height
+                new_height = video_height
+                new_width = int(new_height * aspect_ratio)
+            else:
+                # Image is taller, fit to width
+                new_width = video_width
+                new_height = int(new_width / aspect_ratio)
+            
+            resized_clip = clip.resize(height=new_height, width=new_width)
+            x_offset = (video_width - new_width) // 2
+            y_offset = (video_height - new_height) // 2
+            final_clip = resized_clip.set_position((x_offset, y_offset))
         else:
-            # Use the existing logic for resizing and positioning
+            # Use the existing logic for resizing and positioning when dimensions are specified
             target_width = parse_percentage(element.get('width', '100%'), video_width)
             target_height = parse_percentage(element.get('height', '100%'), video_height)
-            resized_clip = clip.resize(width=target_width, height=target_height)
-
+            
+            # Resize the clip to cover the target dimensions
+            aspect_ratio = clip.w / clip.h
+            target_ratio = target_width / target_height
+            
+            if aspect_ratio > target_ratio:
+                new_height = target_height
+                new_width = int(new_height * aspect_ratio)
+            else:
+                new_width = target_width
+                new_height = int(new_width / aspect_ratio)
+            
+            resized_clip = clip.resize(height=new_height, width=new_width)
+            
+            # Crop to fit the target dimensions
+            x_center = resized_clip.w / 2
+            y_center = resized_clip.h / 2
+            final_clip = resized_clip.crop(
+                x1=x_center - target_width / 2,
+                y1=y_center - target_height / 2,
+                width=target_width,
+                height=target_height
+            )
+            
+            # Position the clip
             x_percentage = element.get('x', "0%")
             y_percentage = element.get('y', "0%")
-            final_x = parse_percentage(x_percentage, video_width - resized_clip.w)
-            final_y = parse_percentage(y_percentage, video_height - resized_clip.h)
+            final_x = parse_percentage(x_percentage, video_width - final_clip.w)
+            final_y = parse_percentage(y_percentage, video_height - final_clip.h)
+            final_clip = final_clip.set_position((final_x, final_y))
 
-        final_clip = resized_clip.set_position((final_x, final_y))
         final_clip.name = element['id']
         final_clip.track = element.get('track', 0)
 
-        logging.info(f"Created {'GIF' if source.lower().endswith('.gif') else 'image'} clip for element {element['id']} positioned at ({final_x}, {final_y}) with size {resized_clip.w}x{resized_clip.h}.")
+        logging.info(f"Created {'GIF' if source.lower().endswith('.gif') else 'image'} clip for element {element['id']} positioned at {final_clip.pos} with size {final_clip.w}x{final_clip.h}.")
         return final_clip
 
     except Exception as e:
