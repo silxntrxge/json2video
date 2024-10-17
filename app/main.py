@@ -4,6 +4,13 @@ from typing import List, Optional, Union
 from video_generator import generate_video
 from webhook_sender import send_webhook
 import logging
+import os
+import sys
+
+# Add these lines at the beginning for debugging
+print("Python version:", sys.version)
+print("Current working directory:", os.getcwd())
+print("Contents of current directory:", os.listdir())
 
 app = FastAPI()
 
@@ -65,6 +72,13 @@ async def process_video_request(json_data: dict, webhook_url: str):
     else:
         logging.error("Video generation failed; webhook not sent.")
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+@app.get("/")
+async def root():
+    return {"message": "JSON2Video API is running"}
+
+@app.post("/generate")
+async def generate_video_endpoint(data: dict):
+    # Your video generation logic here
+    # Use generate_video function from video_generator.py
+    # Use send_webhook function from webhook_sender.py
+    pass
