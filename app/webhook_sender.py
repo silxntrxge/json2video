@@ -6,6 +6,9 @@ import string
 import time
 import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 def compress_video(input_path, output_path):
     command = [
         'ffmpeg',
@@ -50,12 +53,24 @@ def upload_to_0x0(file_path, max_retries=3):
                 raise Exception(f"Failed to upload file after {max_retries} attempts due to network errors.")
 
 def send_webhook(webhook_url, video_url):
-    data = {
-        'content': f'Video generated: {video_url}'
-    }
+    """
+    Sends a webhook with the video URL.
+
+    Args:
+        webhook_url (str): The URL to send the webhook to.
+        video_url (str): The URL of the generated video.
+
+    Returns:
+        bool: True if the webhook was sent successfully, False otherwise.
+    """
     try:
-        response = requests.post(webhook_url, json=data)
+        payload = {
+            "video_url": video_url
+        }
+        response = requests.post(webhook_url, json=payload)
         response.raise_for_status()
         logging.info(f"Webhook sent successfully to {webhook_url}")
-    except Exception as e:
-        logging.error(f"Failed to send webhook to {webhook_url}: {e}")
+        return True
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error sending webhook: {str(e)}")
+        return False

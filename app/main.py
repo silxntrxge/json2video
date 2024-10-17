@@ -4,15 +4,11 @@ from typing import List, Optional, Union
 from .video_generator import generate_video
 from .webhook_sender import send_webhook
 import logging
-import os
-import sys
-
-# Add these lines at the beginning for debugging
-print("Python version:", sys.version)
-print("Current working directory:", os.getcwd())
-print("Contents of current directory:", os.listdir())
 
 app = FastAPI()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class Animation(BaseModel):
     easing: str
@@ -49,24 +45,24 @@ class VideoRequest(BaseModel):
     width: int
     height: int
     duration: float
-    snapshot_time: Optional[float] = None  # Make this optional
-    elements: List[Union[SubElement, Element]]  # Allow both SubElement and Element
+    snapshot_time: Optional[float] = None
+    elements: List[Union[SubElement, Element]]
 
 @app.post("/generate_video")
 async def create_video(request: VideoRequest, background_tasks: BackgroundTasks, x_webhook_url: str = Header(...)):
-    # Generate video in the background
+    logging.info("Received video generation request")
     background_tasks.add_task(process_video_request, request.dict(), x_webhook_url)
     return {"message": "Video generation started"}
 
 async def process_video_request(json_data: dict, webhook_url: str):
-    # Generate the video and get the upload URL
+    logging.info("Starting video generation process")
     video_url = generate_video(json_data)
     
     if video_url:
         try:
-            # Send the video URL via webhook
+            logging.info(f"Video generated successfully. URL: {video_url}")
             send_webhook(webhook_url, video_url)
-            logging.info(f"Sent webhook with video URL: {video_url}")
+            logging.info("Webhook sent successfully")
         except Exception as e:
             logging.error(f"Error sending webhook: {str(e)}")
     else:
@@ -76,9 +72,6 @@ async def process_video_request(json_data: dict, webhook_url: str):
 async def root():
     return {"message": "JSON2Video API is running"}
 
-@app.post("/generate")
-async def generate_video_endpoint(data: dict):
-    # Your video generation logic here
-    # Use generate_video function from video_generator.py
-    # Use send_webhook function from webhook_sender.py
-    pass
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
