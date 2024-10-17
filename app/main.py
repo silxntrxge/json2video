@@ -3,7 +3,6 @@ from pydantic import BaseModel
 from typing import List, Optional, Union
 from video_generator import generate_video
 from webhook_sender import send_webhook
-import os
 import logging
 
 app = FastAPI()

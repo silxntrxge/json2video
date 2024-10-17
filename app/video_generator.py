@@ -508,7 +508,7 @@ def generate_video(json_data):
         json_data (dict): The JSON configuration.
 
     Returns:
-        str or None: The path to the generated video or None if failed.
+        str or None: The URL of the uploaded video or None if failed.
     """
     try:
         video_spec = json_data
@@ -574,22 +574,21 @@ def generate_video(json_data):
                         response = requests.post('https://0x0.st', files={'file': file})
                     video_url = response.text.strip()
                     logging.info(f"Uploaded video to 0x0.st: {video_url}")
+                    return video_url
                 except Exception as e:
                     logging.error(f"Failed to upload video to 0x0.st: {e}")
-                    video_url = None
+                    return None
                 finally:
                     # Clean up the temporary file
                     os.unlink(temp_file_path)
-                
-                return video_url
 
             except Exception as e:
                 print(f"Error creating or writing the final video: {e}")
                 return None
         else:
-            print("Error: No valid clips were created.")
+            logging.error("Error: No valid clips were created.")
             return None
 
     except Exception as e:
-        print(f"An unexpected error occurred during video generation: {e}")
+        logging.error(f"An unexpected error occurred during video generation: {e}")
         return None
