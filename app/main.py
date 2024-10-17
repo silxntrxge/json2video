@@ -4,6 +4,7 @@ from typing import List, Optional, Union
 from video_generator import generate_video
 from webhook_sender import send_webhook
 import os
+import logging
 
 app = FastAPI()
 
@@ -52,17 +53,18 @@ async def create_video(request: VideoRequest, background_tasks: BackgroundTasks,
     return {"message": "Video generation started"}
 
 async def process_video_request(json_data: dict, webhook_url: str):
-    # Generate the video
-    video_path = generate_video(json_data)
+    # Generate the video and get the upload URL
+    video_url = generate_video(json_data)
     
-    if video_path:
+    if video_url:
         try:
-            # Send the video via webhook
-            send_webhook(webhook_url, video_path)
+            # Send the video URL via webhook
+            send_webhook(webhook_url, video_url)
+            logging.info(f"Sent webhook with video URL: {video_url}")
         except Exception as e:
-            print(f"Error sending webhook: {str(e)}")
+            logging.error(f"Error sending webhook: {str(e)}")
     else:
-        print("Video generation failed; webhook not sent.")
+        logging.error("Video generation failed; webhook not sent.")
 
 if __name__ == "__main__":
     import uvicorn

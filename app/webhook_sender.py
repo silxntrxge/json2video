@@ -4,6 +4,7 @@ import os
 import random
 import string
 import time
+import logging
 
 def compress_video(input_path, output_path):
     command = [
@@ -48,15 +49,13 @@ def upload_to_0x0(file_path, max_retries=3):
             else:
                 raise Exception(f"Failed to upload file after {max_retries} attempts due to network errors.")
 
-def send_webhook(webhook_url, video_path):
+def send_webhook(webhook_url, video_url):
+    data = {
+        'content': f'Video generated: {video_url}'
+    }
     try:
-        if video_path is None:
-            print("No video path provided; skipping webhook.")
-            return
-        with open(video_path, 'rb') as f:
-            files = {'file': f}
-            response = requests.post(webhook_url, files=files)
-            response.raise_for_status()
-        print("Webhook sent successfully.")
+        response = requests.post(webhook_url, json=data)
+        response.raise_for_status()
+        logging.info(f"Webhook sent successfully to {webhook_url}")
     except Exception as e:
-        print(f"Error sending webhook: {str(e)}")
+        logging.error(f"Failed to send webhook to {webhook_url}: {e}")

@@ -15,7 +15,8 @@ from moviepy.editor import (
     CompositeVideoClip,
     CompositeAudioClip,
     ImageSequenceClip,
-    concatenate_videoclips
+    concatenate_videoclips,
+    vfx
 )
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import ffmpy
@@ -302,6 +303,40 @@ def create_image_clip(element, video_width, video_height):
         # Set clip duration and start time
         clip = clip.set_duration(duration or None).set_start(start_time)
 
+        # Handle animations
+        animations = element.get('animations', [])
+        if animations:
+            for anim in animations:
+                if anim['type'] == 'scale':
+                    # Adjust start_time and end_time based on the clip's start time
+                    anim_start_time = anim.get('time', 0)
+                    anim_end_time = anim_start_time + anim.get('duration', clip.duration)
+                    start_scale = parse_percentage(anim.get('start_scale', '100%'), 100) / 100
+                    end_scale = parse_percentage(anim.get('end_scale', '130%'), 100) / 100
+                    easing = anim.get('easing', 'linear')
+
+                    def scale_func(t):
+                        logging.info(f"Calculating scale for time {t}")
+                        if t < anim_start_time:
+                            return start_scale
+                        elif t > anim_end_time:
+                            return end_scale
+                        else:
+                            progress = (t - anim_start_time) / (anim_end_time - anim_start_time)
+                            if easing == 'quadratic-out':
+                                progress = 1 - (1 - progress) ** 2
+                            scale = start_scale + (end_scale - start_scale) * progress
+                            logging.info(f"Scale at time {t}: {scale}")
+                            return scale
+
+                    # Apply scaling using resize with updated scale_func
+                    clip = clip.resize(lambda t: scale_func(t))
+
+                    # Debugging: Verify animation parameters
+                    logging.info(f"Animation Start Time: {anim_start_time}, End Time: {anim_end_time}")
+                    logging.info(f"Start Scale: {start_scale}, End Scale: {end_scale}")
+                    logging.info(f"Easing: {easing}")
+
         # Check if width, height, x, and y are specified
         if all(element.get(attr) is None for attr in ['width', 'height', 'x', 'y']):
             # If none are specified, make the image cover the entire video
@@ -521,28 +556,33 @@ def generate_video(json_data):
                     final_video = final_video.set_audio(composite_audio)
                     print("Added CompositeAudioClip to the final video")
 
-                # Generate a unique filename for the output video
-                unique_filename = f"output_video_{uuid.uuid4().hex}.mp4"
-                desktop_path = os.path.expanduser("~/Desktop")
-                output_path = os.path.join(desktop_path, unique_filename)
+                # Upload video to 0x0.st instead of exporting as a file
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
+                    final_video.write_videofile(
+                        temp_file.name,
+                        fps=video_fps,
+                        codec="libx264",
+                        audio_codec="aac",
+                        temp_audiofile='temp-audio.m4a',
+                        remove_temp=True
+                    )
+                    temp_file_path = temp_file.name
+                
+                # Upload the video to 0x0.st
+                try:
+                    with open(temp_file_path, 'rb') as file:
+                        response = requests.post('https://0x0.st', files={'file': file})
+                    video_url = response.text.strip()
+                    logging.info(f"Uploaded video to 0x0.st: {video_url}")
+                except Exception as e:
+                    logging.error(f"Failed to upload video to 0x0.st: {e}")
+                    video_url = None
+                finally:
+                    # Clean up the temporary file
+                    os.unlink(temp_file_path)
+                
+                return video_url
 
-                print(f"Attempting to write video file to: {output_path}")
-
-                final_video.write_videofile(
-                    output_path,
-                    fps=video_fps,
-                    codec="libx264",
-                    audio_codec="aac",
-                    temp_audiofile='temp-audio.m4a',
-                    remove_temp=True
-                )
-
-                if os.path.exists(output_path):
-                    print(f"Video exported successfully to: {output_path}")
-                    return output_path
-                else:
-                    print(f"Error: Video file was not created at {output_path}")
-                    return None
             except Exception as e:
                 print(f"Error creating or writing the final video: {e}")
                 return None
