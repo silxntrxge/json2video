@@ -2,8 +2,16 @@ services:
   - type: web
     name: json2video
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg libsm6 libxext6
+      pip install -r requirements.txt
+    startCommand: |
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
+      - key: PORT
+        value: 8080
+    autoDeploy: true
+    region: frankfurt  # You can change this to your preferred region
