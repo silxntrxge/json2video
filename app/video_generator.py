@@ -523,17 +523,6 @@ def create_clip(element, video_width, video_height, video_spec):
         return None
 
 
-def custom_logger(progress, message=None):
-    if message:
-        print(message)
-    elif progress == 0:
-        print("Starting video generation...")
-    elif progress % 30 == 0:
-        print(f"Video generation progress: {progress}%")
-    elif progress == 100:
-        print("Video generation complete!")
-
-
 def generate_video(json_data):
     """
     Generates a video based on the provided JSON configuration.
@@ -627,7 +616,7 @@ def generate_video(json_data):
 
                     logging.info("Using software encoding with libx264")
 
-                    # Use write_videofile with software encoding settings and custom logger
+                    # Use write_videofile with software encoding settings
                     final_video.write_videofile(
                         temp_file.name,
                         fps=video_fps,
@@ -635,7 +624,7 @@ def generate_video(json_data):
                         audio_codec="aac",
                         temp_audiofile='temp-audio.m4a',
                         remove_temp=True,
-                        logger=custom_logger,
+                        logger='bar',
                         ffmpeg_params=ffmpeg_params
                     )
                     temp_file_path = temp_file.name
