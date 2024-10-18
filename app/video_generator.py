@@ -439,6 +439,7 @@ def create_text_clip(element, video_width, video_height, total_duration):
     Returns:
         TextClip or None: The created text clip or None if failed.
     """
+    logging.info(f"Starting to create text clip for element: {element['id']}")
     text = element.get('text')
     start_time = element.get('time', 0.0)
     duration = element.get('duration')
@@ -450,6 +451,8 @@ def create_text_clip(element, video_width, video_height, total_duration):
     font_size = parse_percentage(element.get('font_size', "5%"), min(video_width, video_height), video_height)
     font_url = element.get('font_family')
     font_path = "Arial"  # Default font
+
+    logging.info(f"Text content: '{text}', Font size: {font_size}, Font URL: {font_url}")
 
     if font_url and font_url.startswith('http'):
         try:
@@ -485,7 +488,7 @@ def create_text_clip(element, video_width, video_height, total_duration):
             fontsize=font_size,
             font=font_path,
             color=element.get('fill_color', 'white'),
-            method='label',
+            method='label',  # Consider changing to 'caption' if issues persist
             transparent=True
         ).set_duration(duration)
 
@@ -516,6 +519,7 @@ def create_text_clip(element, video_width, video_height, total_duration):
     finally:
         if font_url and font_url.startswith('http') and os.path.exists(font_path) and font_path != "Arial":
             os.unlink(font_path)
+            logging.info(f"Cleaned up temporary font file: {font_path}")
 
 
 def create_clip(element, video_width, video_height, video_spec):
