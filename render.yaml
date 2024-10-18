@@ -4,7 +4,7 @@ services:
     env: docker
     dockerfilePath: ./Dockerfile
     buildCommand: docker build -t json2video .
-    startCommand: docker run -p 8000:8000 -e PORT=8000 json2video
+    startCommand: docker run -p 8000:8000 -e PORT=8000 -e MAGICK_CONFIGURE_PATH=/app json2video
     plan: free
     maxmemoryPolicy: noeviction
     memory: 512

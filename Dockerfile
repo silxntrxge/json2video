@@ -14,11 +14,11 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure ImageMagick policy to allow PDF operations
-RUN sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml
-
 # Copy the current directory contents into the container at /app
 COPY . /app
+
+# Copy the custom ImageMagick policy file
+COPY policy.xml /app/policy.xml
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
