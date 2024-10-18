@@ -523,6 +523,15 @@ def create_clip(element, video_width, video_height, video_spec):
         return None
 
 
+def custom_logger(progress):
+    if progress == 0:
+        print("Starting video generation...")
+    elif progress % 30 == 0:
+        print(f"Video generation progress: {progress}%")
+    elif progress == 100:
+        print("Video generation complete!")
+
+
 def generate_video(json_data):
     """
     Generates a video based on the provided JSON configuration.
@@ -600,10 +609,7 @@ def generate_video(json_data):
                     # Get the number of CPU cores
                     num_cores = multiprocessing.cpu_count()
 
-                    # Check for hardware acceleration
-                    hw_accel = get_hardware_acceleration()
-
-                    # Prepare FFmpeg parameters
+                    # Prepare FFmpeg parameters for software encoding
                     ffmpeg_params = [
                         "-preset", "ultrafast",
                         "-crf", "23",
@@ -617,27 +623,17 @@ def generate_video(json_data):
                         "-threads", str(num_cores)
                     ]
 
-                    # Set codec based on hardware acceleration
-                    codec = "libx264"
-                    if hw_accel:
-                        if hw_accel == 'cuda':
-                            codec = "h264_nvenc"
-                        elif hw_accel == 'vaapi':
-                            codec = "h264_vaapi"
-                        elif hw_accel == 'videotoolbox':
-                            codec = "h264_videotoolbox"
+                    logging.info("Using software encoding with libx264")
 
-                    logging.info(f"Using codec: {codec}")
-
-                    # Use write_videofile with further optimized settings
+                    # Use write_videofile with software encoding settings and custom logger
                     final_video.write_videofile(
                         temp_file.name,
                         fps=video_fps,
-                        codec=codec,
+                        codec="libx264",
                         audio_codec="aac",
                         temp_audiofile='temp-audio.m4a',
                         remove_temp=True,
-                        logger='bar',
+                        logger=custom_logger,
                         ffmpeg_params=ffmpeg_params
                     )
                     temp_file_path = temp_file.name
@@ -672,29 +668,4 @@ def generate_video(json_data):
         return None
     except Exception as e:
         logging.error(f"An unexpected error occurred during video generation: {str(e)}", exc_info=True)
-        return None
-
-def get_hardware_acceleration():
-    try:
-        # Check available encoders
-        result = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True, timeout=5)
-        encoders = result.stdout.lower()
-        
-        if 'h264_nvenc' in encoders:
-            logging.info("NVIDIA GPU acceleration (NVENC) is available.")
-            return 'cuda'
-        elif 'h264_vaapi' in encoders:
-            logging.info("VAAPI acceleration is available.")
-            return 'vaapi'
-        elif 'h264_videotoolbox' in encoders:
-            logging.info("VideoToolbox acceleration is available.")
-            return 'videotoolbox'
-        else:
-            logging.info("No supported hardware encoding found. Falling back to software encoding.")
-            return None
-    except subprocess.TimeoutExpired:
-        logging.error("Timeout while checking for hardware acceleration.")
-        return None
-    except Exception as e:
-        logging.error(f"Error checking for hardware acceleration: {str(e)}")
         return None
