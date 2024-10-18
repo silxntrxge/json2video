@@ -6,7 +6,7 @@ import tempfile
 from io import BytesIO
 
 import numpy as np
-from PIL import Image, ImageSequence
+from PIL import Image, ImageSequence, ImageDraw, ImageFont
 from moviepy.editor import (
     VideoFileClip,
     ImageClip,
@@ -427,30 +427,18 @@ def create_image_clip(element, video_width, video_height):
 
 
 def create_text_clip(element, video_width, video_height, total_duration):
-    """
-    Creates a text clip from the provided element.
-
-    Args:
-        element (dict): The JSON element for the text.
-        video_width (int): The width of the video.
-        video_height (int): The height of the video.
-        total_duration (float): The total duration of the video.
-
-    Returns:
-        TextClip or None: The created text clip or None if failed.
-    """
     logging.info(f"Starting to create text clip for element: {element['id']}")
-    text = element.get('text')
+    text = element.get('text', '').strip()
     start_time = element.get('time', 0.0)
     duration = element.get('duration')
 
     if not text:
-        logging.error(f"Text element {element['id']} has no text content.")
+        logging.warning(f"Text element {element['id']} has no text content. Skipping this element.")
         return None
 
     font_size = parse_percentage(element.get('font_size', "5%"), min(video_width, video_height), video_height)
     font_url = element.get('font_family')
-    font_path = "Arial"  # Default font
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"  # Default font
 
     logging.info(f"Text content: '{text}', Font size: {font_size}, Font URL: {font_url}")
 
@@ -458,17 +446,8 @@ def create_text_clip(element, video_width, video_height, total_duration):
         try:
             temp_font_file = download_file(font_url, suffix='.ttf')
             if temp_font_file:
-                # Set permissions for the font file
-                os.chmod(temp_font_file, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH)
-                
-                # Validate the font file
-                try:
-                    TTFont(temp_font_file)
-                    font_path = temp_font_file
-                    logging.info(f"Successfully downloaded and validated font: {font_path}")
-                except Exception as font_error:
-                    logging.error(f"Invalid font file: {str(font_error)}")
-                    font_path = "Arial"
+                font_path = temp_font_file
+                logging.info(f"Successfully downloaded font: {font_path}")
         except Exception as e:
             logging.error(f"Error downloading font: {str(e)}")
 
@@ -477,52 +456,43 @@ def create_text_clip(element, video_width, video_height, total_duration):
         if duration is None:
             duration = total_duration - start_time
 
-        if DEBUG:
-            logging.info(f"Creating text clip with text: {text}")
-            logging.info(f"Font path: {font_path}")
-            logging.info(f"Font size: {font_size}")
-            logging.info(f"ImageMagick binary: {os.environ.get('IMAGEMAGICK_BINARY', 'Not set')}")
+        # Create a transparent image
+        img = Image.new('RGBA', (video_width, video_height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
 
-        logging.info(f"Attempting to create TextClip with text: '{text}'")
-        text_clip = TextClip(
-            txt=text,
-            fontsize=font_size,
-            font=font_path,
-            color=element.get('fill_color', 'white'),
-            method='label',
-            transparent=True
-        ).set_duration(duration)
-        logging.info("TextClip created successfully")
+        # Load the font
+        font = ImageFont.truetype(font_path, font_size)
 
-        if DEBUG:
-            logging.info(f"Text clip created with size: {text_clip.w}x{text_clip.h}")
+        # Get text size
+        text_width, text_height = draw.textsize(text, font=font)
 
-        # Parse position (top-left based)
+        # Calculate position
         x_percentage = element.get('x', "0%")
         y_percentage = element.get('y', "0%")
-        
-        # Calculate x and y positions
-        final_x = parse_percentage(x_percentage, video_width)
-        final_y = parse_percentage(y_percentage, video_height)
+        x = parse_percentage(x_percentage, video_width - text_width)
+        y = parse_percentage(y_percentage, video_height - text_height)
 
-        # Ensure coordinates are within bounds
-        final_x = max(0, min(final_x, video_width - text_clip.w))
-        final_y = max(0, min(final_y, video_height - text_clip.h))
+        # Draw the text
+        draw.text((x, y), text, font=font, fill=element.get('fill_color', 'white'))
 
-        logging.info(f"Positioning text element {element['id']} at ({final_x}, {final_y}) with size {text_clip.w}x{text_clip.h} and duration {duration}")
+        # Convert PIL Image to numpy array
+        img_array = np.array(img)
 
-        final_clip = text_clip.set_position((final_x, final_y)).set_start(start_time)
+        # Create ImageClip from numpy array
+        text_clip = ImageClip(img_array, transparent=True).set_duration(duration)
+
+        final_clip = text_clip.set_start(start_time)
         final_clip.name = element['id']
         final_clip.track = element.get('track', 0)
+
+        logging.info(f"Successfully created text clip for element {element['id']}")
         return final_clip
+
     except Exception as e:
         logging.error(f"Error creating text clip for element {element['id']}: {str(e)}", exc_info=True)
-        logging.error(f"Text content: '{text}'")
-        logging.error(f"Font path: {font_path}")
-        logging.error(f"Font size: {font_size}")
         return None
     finally:
-        if font_url and font_url.startswith('http') and os.path.exists(font_path) and font_path != "Arial":
+        if font_url and font_url.startswith('http') and os.path.exists(font_path) and font_path != "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf":
             os.unlink(font_path)
             logging.info(f"Cleaned up temporary font file: {font_path}")
 
