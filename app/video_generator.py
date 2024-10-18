@@ -627,6 +627,8 @@ def generate_video(json_data):
                         elif hw_accel == 'videotoolbox':
                             codec = "h264_videotoolbox"
 
+                    logging.info(f"Using codec: {codec}")
+
                     # Use write_videofile with further optimized settings
                     final_video.write_videofile(
                         temp_file.name,
@@ -674,17 +676,21 @@ def generate_video(json_data):
 
 def get_hardware_acceleration():
     try:
-        result = subprocess.run(['ffmpeg', '-hwaccels'], capture_output=True, text=True, timeout=5)
-        accelerators = result.stdout.strip().split('\n')[1:]  # Skip the first line
-        logging.info(f"Available hardware accelerators: {accelerators}")
-        if 'cuda' in accelerators:
+        # Check available encoders
+        result = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True, timeout=5)
+        encoders = result.stdout.lower()
+        
+        if 'h264_nvenc' in encoders:
+            logging.info("NVIDIA GPU acceleration (NVENC) is available.")
             return 'cuda'
-        elif 'vaapi' in accelerators:
+        elif 'h264_vaapi' in encoders:
+            logging.info("VAAPI acceleration is available.")
             return 'vaapi'
-        elif 'videotoolbox' in accelerators:
+        elif 'h264_videotoolbox' in encoders:
+            logging.info("VideoToolbox acceleration is available.")
             return 'videotoolbox'
         else:
-            logging.info("No supported hardware acceleration found.")
+            logging.info("No supported hardware encoding found. Falling back to software encoding.")
             return None
     except subprocess.TimeoutExpired:
         logging.error("Timeout while checking for hardware acceleration.")
