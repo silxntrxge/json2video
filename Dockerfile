@@ -4,6 +4,19 @@ FROM python:3.9
 # Set the working directory in the container
 WORKDIR /app
 
+# Install system dependencies including ImageMagick
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    imagemagick \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure ImageMagick policy to allow PDF operations
+RUN sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml
+
 # Copy the current directory contents into the container at /app
 COPY . /app
 
