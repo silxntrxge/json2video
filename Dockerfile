@@ -15,14 +15,6 @@ RUN apt-get update && apt-get install -y \
     fontconfig \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure ImageMagick policy to allow various image operations and increase memory limits
-RUN sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/rights="none" pattern="LABEL"/rights="read|write" pattern="LABEL"/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/<policy domain="coder" rights="none" pattern="PNG" \/>/<policy domain="coder" rights="read|write" pattern="PNG" \/>/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/<policy domain="coder" rights="none" pattern="GIF" \/>/<policy domain="coder" rights="read|write" pattern="GIF" \/>/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/name="memory" value="256MiB"/name="memory" value="1GiB"/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/name="disk" value="1GiB"/name="disk" value="4GiB"/' /etc/ImageMagick-6/policy.xml
-
 # Copy the current directory contents into the container at /app
 COPY . /app
 
