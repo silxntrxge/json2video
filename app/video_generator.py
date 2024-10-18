@@ -31,6 +31,7 @@ from fontTools.ttLib import TTFont
 import subprocess
 from moviepy.config import change_settings
 import stat
+import multiprocessing
 
 # Set the ImageMagick binary path
 magick_home = os.environ.get('MAGICK_HOME', '/usr')
@@ -596,6 +597,10 @@ def generate_video(json_data):
                     # Set permissions for the temporary video file
                     os.chmod(temp_file.name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH)
                     
+                    # Get the number of CPU cores
+                    num_cores = multiprocessing.cpu_count()
+
+                    # Use write_videofile with optimized settings
                     final_video.write_videofile(
                         temp_file.name,
                         fps=video_fps,
@@ -604,8 +609,9 @@ def generate_video(json_data):
                         temp_audiofile='temp-audio.m4a',
                         remove_temp=True,
                         logger='bar',
-                        threads=2,
-                        bitrate="1000k"
+                        threads=num_cores,  # Use all available CPU cores
+                        preset="ultrafast",  # Use the fastest preset to reduce CPU usage
+                        ffmpeg_params=["-crf", "23"]  # Balance between quality and file size
                     )
                     temp_file_path = temp_file.name
                 
