@@ -3,11 +3,9 @@ services:
     name: json2video
     env: docker
     dockerfilePath: ./Dockerfile
-    envVars:
-      - key: ENV
-        value: production
+    buildCommand: docker build -t json2video .
+    startCommand: docker run -p 8000:8000 -e PORT=8000 json2video
     plan: free
     maxmemoryPolicy: noeviction
-    memory: 1024
+    memory: 512
     timeout: 300  # 5 minutes timeout
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

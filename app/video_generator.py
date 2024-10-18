@@ -26,7 +26,7 @@ import logging
 import imageio
 from moviepy.video.VideoClip import VideoClip
 import gc
-import psutil  # Make sure this line is present
+import psutil  # Ensure this line is present
 
 # Configure logging at the beginning of your script
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
