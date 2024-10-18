@@ -30,10 +30,17 @@ import psutil  # Make sure this line is present
 from fontTools.ttLib import TTFont
 import subprocess
 from moviepy.config import change_settings
+import stat
 
 # Set the ImageMagick binary path
 magick_home = os.environ.get('MAGICK_HOME', '/usr')
-change_settings({"IMAGEMAGICK_BINARY": os.path.join(magick_home, "bin", "convert")})
+imagemagick_binary = os.path.join(magick_home, "bin", "convert")
+
+if os.path.exists(imagemagick_binary):
+    change_settings({"IMAGEMAGICK_BINARY": imagemagick_binary})
+    logging.info(f"ImageMagick binary set to: {imagemagick_binary}")
+else:
+    logging.warning(f"ImageMagick binary not found at {imagemagick_binary}. Using default.")
 
 # Configure logging at the beginning of your script
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -59,9 +66,13 @@ def download_file(url, suffix=''):
             if chunk:
                 temp_file.write(chunk)
         temp_file.close()
+        
+        # Set permissions to be readable and writable by all users
+        os.chmod(temp_file.name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH)
+        
         return temp_file.name
     except Exception as e:
-        print(f"Error downloading file from {url}: {e}")
+        logging.error(f"Error downloading file from {url}: {e}")
         return None
 
 
@@ -444,6 +455,9 @@ def create_text_clip(element, video_width, video_height, total_duration):
         try:
             temp_font_file = download_file(font_url, suffix='.ttf')
             if temp_font_file:
+                # Set permissions for the font file
+                os.chmod(temp_font_file, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH)
+                
                 # Validate the font file
                 try:
                     TTFont(temp_font_file)
@@ -599,6 +613,10 @@ def generate_video(json_data):
                 # Upload video to 0x0.st instead of exporting as a file
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
                     logging.info(f"Writing video to temporary file: {temp_file.name}")
+                    
+                    # Set permissions for the temporary video file
+                    os.chmod(temp_file.name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH)
+                    
                     final_video.write_videofile(
                         temp_file.name,
                         fps=video_fps,
@@ -607,8 +625,8 @@ def generate_video(json_data):
                         temp_audiofile='temp-audio.m4a',
                         remove_temp=True,
                         logger='bar',
-                        threads=2,  # Limit threads to reduce memory usage
-                        bitrate="1000k"  # Reduce bitrate to save memory
+                        threads=2,
+                        bitrate="1000k"
                     )
                     temp_file_path = temp_file.name
                 
