@@ -1,14 +1,26 @@
 from fastapi import FastAPI, BackgroundTasks, Header, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Union
-from .video_generator import generate_video
-from .webhook_sender import send_webhook
+from video_generator import generate_video
+from webhook_sender import send_webhook
 import logging
+import os
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
 
 app = FastAPI()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 class Animation(BaseModel):
     easing: str
@@ -73,5 +85,15 @@ async def root():
     return {"message": "JSON2Video API is running"}
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
+    # Check if running in a production environment
+    if os.environ.get("ENV") == "production":
+        # Production settings
+        host = "0.0.0.0"
+        port = int(os.environ.get("PORT", 8000))
+    else:
+        # Local development settings
+        host = "127.0.0.1"
+        port = 8000
+
+    # Run the server
+    uvicorn.run(app, host=host, port=port)
