@@ -8,4 +8,5 @@ numpy==1.24.3
 imageio==2.31.1
 opencv-python==4.7.0.72
 ffmpy==0.3.1
-Pillow==9.5.0  # This version still supports ANTIALIAS
+Pillow==9.5.0
+fonttools==4.38.0

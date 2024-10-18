@@ -27,9 +27,13 @@ import imageio
 from moviepy.video.VideoClip import VideoClip
 import gc
 import psutil  # Make sure this line is present
+from fontTools.ttLib import TTFont
+import subprocess
 
 # Configure logging at the beginning of your script
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+DEBUG = os.environ.get('DEBUG', '0') == '1'
 
 def download_file(url, suffix=''):
     """
@@ -429,13 +433,22 @@ def create_text_clip(element, video_width, video_height, total_duration):
 
     font_size = parse_percentage(element.get('font_size', "5%"), min(video_width, video_height), video_height)
     font_url = element.get('font_family')
+    font_path = "Arial"  # Default font
 
     if font_url and font_url.startswith('http'):
-        font_path = download_file(font_url, suffix='.ttf')
-        if not font_path:
-            font_path = "Arial"  # Fallback
-    else:
-        font_path = "Arial"  # Default font
+        try:
+            temp_font_file = download_file(font_url, suffix='.ttf')
+            if temp_font_file:
+                # Validate the font file
+                try:
+                    TTFont(temp_font_file)
+                    font_path = temp_font_file
+                    logging.info(f"Successfully downloaded and validated font: {font_path}")
+                except Exception as font_error:
+                    logging.error(f"Invalid font file: {str(font_error)}")
+                    font_path = "Arial"
+        except Exception as e:
+            logging.error(f"Error downloading font: {str(e)}")
 
     try:
         # If duration is not specified, use the remaining video duration
@@ -473,7 +486,7 @@ def create_text_clip(element, video_width, video_height, total_duration):
         logging.error(f"Error creating text clip for element {element['id']}: {e}")
         return None
     finally:
-        if font_url and font_url.startswith('http') and os.path.exists(font_path):
+        if font_url and font_url.startswith('http') and os.path.exists(font_path) and font_path != "Arial":
             os.unlink(font_path)
 
 
