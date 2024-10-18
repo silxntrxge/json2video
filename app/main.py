@@ -1,12 +1,16 @@
 from fastapi import FastAPI, BackgroundTasks, Header, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Union
-from video_generator import generate_video
+from video_generator import generate_video  # This line imports generate_video
 from webhook_sender import send_webhook
+from .video_generator import generate_video  # Change this line
+from .webhook_sender import send_webhook 
 import logging
 import os
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
 
 app = FastAPI()
 
@@ -60,33 +64,50 @@ class VideoRequest(BaseModel):
     snapshot_time: Optional[float] = None
     elements: List[Union[SubElement, Element]]
 
+# Create a ProcessPoolExecutor with a maximum of 2 workers
+process_pool = ProcessPoolExecutor(max_workers=2)
+
 @app.post("/generate_video")
 async def create_video(request: VideoRequest, background_tasks: BackgroundTasks, x_webhook_url: str = Header(...)):
     logging.info("Received video generation request")
-    background_tasks.add_task(process_video_request, request.dict(), x_webhook_url)
+    background_tasks.add_task(process_video_request_with_timeout, request.dict(), x_webhook_url)
     return {"message": "Video generation started"}
 
-async def process_video_request(json_data: dict, webhook_url: str):
-    logging.info("Starting video generation process")
-    video_url = generate_video(json_data)
-    
-    if video_url:
-        try:
+async def process_video_request_with_timeout(json_data: dict, webhook_url: str):
+    try:
+        # Use ProcessPoolExecutor to run the CPU-intensive task
+        loop = asyncio.get_event_loop()
+        video_url = await loop.run_in_executor(process_pool, generate_video, json_data)
+        
+        if video_url:
             logging.info(f"Video generated successfully. URL: {video_url}")
-            send_webhook(webhook_url, video_url)
-            logging.info("Webhook sent successfully")
-        except Exception as e:
-            logging.error(f"Error sending webhook: {str(e)}")
-    else:
-        logging.error("Video generation failed; webhook not sent.")
+            retry_count = 3
+            while retry_count > 0:
+                try:
+                    send_webhook(webhook_url, video_url)
+                    logging.info("Webhook sent successfully")
+                    break
+                except Exception as e:
+                    logging.error(f"Error sending webhook (attempt {4-retry_count}/3): {str(e)}")
+                    retry_count -= 1
+                    if retry_count == 0:
+                        logging.error("Failed to send webhook after 3 attempts")
+        else:
+            logging.error("Video generation failed; webhook not sent.")
+    except asyncio.TimeoutError:
+        logging.error("Video generation timed out")
+        send_webhook(webhook_url, {"error": "Video generation timed out"})
+    except Exception as e:
+        logging.error(f"Error in video generation process: {str(e)}")
+        send_webhook(webhook_url, {"error": str(e)})
 
 @app.get("/")
 async def root():
     return {"message": "JSON2Video API is running"}
 
 if __name__ == "__main__":
-    # Check if running in a production environment
-    if os.environ.get("ENV") == "production":
+    env = os.environ.get("ENV", "development")
+    if env == "production":
         # Production settings
         host = "0.0.0.0"
         port = int(os.environ.get("PORT", 8000))
@@ -96,4 +117,4 @@ if __name__ == "__main__":
         port = 8000
 
     # Run the server
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=host, port=port, reload=(env == "development"))

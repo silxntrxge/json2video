@@ -1,19 +1,23 @@
 services:
   - type: web
     name: json2video
-    env: python
-    plan: free
-    buildCommand: |
-      apt-get update && apt-get install -y ffmpeg libsm6 libxext6
-      pip install -r requirements.txt
-    startCommand: |
-      cd app && uvicorn main:app --host 0.0.0.0 --port $PORT
+    env: docker
+    dockerfilePath: ./Dockerfile
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.9.0
-      - key: PORT
-        value: 8080
-      - key: PYTHONPATH
-        value: /app
-    autoDeploy: true
-    region: frankfurt  # You can change this to your preferred region
+      - key: ENV
+        value: production
+    plan: standard
+    maxmemoryPolicy: noeviction
+    memory: 1024
+    timeout: 1800  # 30 minutes timeout
+
+  - type: web
+    name: json2video-local
+    env: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ENV
+        value: development
+    plan: free
+    memory: 512
+    startCommand: uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload

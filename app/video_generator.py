@@ -21,10 +21,12 @@ from moviepy.editor import (
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import ffmpy
 import io
-import math  # Added for ceiling function
-import logging  # Added for improved logging
+import math
+import logging
 import imageio
 from moviepy.video.VideoClip import VideoClip
+import gc
+import psutil  # Make sure this line is present
 
 # Configure logging at the beginning of your script
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -515,8 +517,8 @@ def generate_video(json_data):
         video_clips = []
         audio_clips = []
 
-        print("Starting video generation process...")
-        print(f"Video specification: {json.dumps(video_spec, indent=2)}")
+        logging.info("Starting video generation process...")
+        logging.info(f"Video specification: {json.dumps(video_spec, indent=2)}")
 
         # Set default values if not provided
         video_duration = video_spec.get('duration', 15.0)
@@ -524,71 +526,91 @@ def generate_video(json_data):
         video_width = video_spec.get('width', 720)
         video_height = video_spec.get('height', 1280)
 
-        for element in video_spec['elements']:
-            print(f"Processing element: {json.dumps(element, indent=2)}")
+        logging.info(f"Video settings: duration={video_duration}, fps={video_fps}, width={video_width}, height={video_height}")
+
+        for index, element in enumerate(video_spec['elements']):
+            logging.info(f"Processing element {index + 1}/{len(video_spec['elements'])}: {json.dumps(element, indent=2)}")
             clip = create_clip(element, video_width, video_height, video_spec)
             if clip:
                 if isinstance(clip, AudioFileClip):
                     audio_clips.append(clip)
-                    print(f"Added audio clip: {element['id']} on track {element.get('track', 0)}")
+                    logging.info(f"Added audio clip: {element['id']} on track {element.get('track', 0)}")
                 else:
                     video_clips.append(clip)
-                    print(f"Added video/image/GIF/text clip: {element['id']} on track {element.get('track', 0)}")
+                    logging.info(f"Added video/image/GIF/text clip: {element['id']} on track {element.get('track', 0)}")
             else:
-                print(f"Failed to create clip for element: {element['id']}")
+                logging.warning(f"Failed to create clip for element: {element['id']}")
+            
+            # Force garbage collection after each element
+            gc.collect()
+            
+            # Log memory usage
+            process = psutil.Process(os.getpid())
+            logging.info(f"Memory usage after processing element {index + 1}: {process.memory_info().rss / 1024 / 1024:.2f} MB")
 
-        print(f"Total video/image/GIF/text clips created: {len(video_clips)}")
-        print(f"Total audio clips created: {len(audio_clips)}")
+        logging.info(f"Total video/image/GIF/text clips created: {len(video_clips)}")
+        logging.info(f"Total audio clips created: {len(audio_clips)}")
 
         if video_clips or audio_clips:
             # Sort video clips based on track number and start time
             video_clips.sort(key=lambda c: (getattr(c, 'track', 0), getattr(c, 'start', 0)))
-            print("Sorted video/image/GIF/text clips based on track number and start time")
+            logging.info("Sorted video/image/GIF/text clips based on track number and start time")
 
             try:
+                logging.info("Creating CompositeVideoClip...")
                 # Create the final composite video
                 final_video = CompositeVideoClip(video_clips, size=(video_width, video_height), bg_color=None).set_duration(video_duration)
-                print("Created CompositeVideoClip with all video/image/GIF/text clips")
+                logging.info("Created CompositeVideoClip with all video/image/GIF/text clips")
 
                 # Combine audio clips
                 if audio_clips:
+                    logging.info("Creating CompositeAudioClip...")
                     composite_audio = CompositeAudioClip(audio_clips)
                     final_video = final_video.set_audio(composite_audio)
-                    print("Added CompositeAudioClip to the final video")
+                    logging.info("Added CompositeAudioClip to the final video")
 
                 # Upload video to 0x0.st instead of exporting as a file
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
+                    logging.info(f"Writing video to temporary file: {temp_file.name}")
                     final_video.write_videofile(
                         temp_file.name,
                         fps=video_fps,
                         codec="libx264",
                         audio_codec="aac",
                         temp_audiofile='temp-audio.m4a',
-                        remove_temp=True
+                        remove_temp=True,
+                        logger='bar',
+                        threads=2,  # Limit threads to reduce memory usage
+                        bitrate="1000k"  # Reduce bitrate to save memory
                     )
                     temp_file_path = temp_file.name
                 
                 # Upload the video to 0x0.st
                 try:
+                    logging.info("Uploading video to 0x0.st...")
                     with open(temp_file_path, 'rb') as file:
                         response = requests.post('https://0x0.st', files={'file': file})
                     video_url = response.text.strip()
-                    print(f"Uploaded video to 0x0.st: {video_url}")
+                    logging.info(f"Uploaded video to 0x0.st: {video_url}")
                     return video_url
                 except Exception as e:
-                    print(f"Failed to upload video to 0x0.st: {e}")
+                    logging.error(f"Failed to upload video to 0x0.st: {e}")
                     return None
                 finally:
                     # Clean up the temporary file
                     os.unlink(temp_file_path)
+                    logging.info(f"Cleaned up temporary file: {temp_file_path}")
 
             except Exception as e:
-                print(f"Error creating or writing the final video: {e}")
+                logging.error(f"Error creating or writing the final video: {e}", exc_info=True)
                 return None
         else:
-            print("Error: No valid clips were created.")
+            logging.error("Error: No valid clips were created.")
             return None
 
+    except MemoryError:
+        logging.error("Out of memory error occurred. Try reducing video quality or duration.")
+        return None
     except Exception as e:
-        print(f"An unexpected error occurred during video generation: {e}")
+        logging.error(f"An unexpected error occurred during video generation: {e}", exc_info=True)
         return None
