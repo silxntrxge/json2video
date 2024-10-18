@@ -33,7 +33,6 @@ EXPOSE 8000
 # Set environment variables for better performance
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-ENV OMP_NUM_THREADS=0  # Let OpenMP automatically set the number of threads
-
+ENV OMP_NUM_THREADS=0 
 # Run the application when the container launches
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers $(nproc)"]

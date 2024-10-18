@@ -606,7 +606,7 @@ def generate_video(json_data):
                     # Prepare FFmpeg parameters
                     ffmpeg_params = [
                         "-preset", "ultrafast",
-                        "-crf", "30",  # Increased CRF for even faster encoding (lower quality but faster)
+                        "-crf", "23",  # Increased CRF for even faster encoding (lower quality but faster)
                         "-tune", "fastdecode,zerolatency",
                         "-movflags", "+faststart",
                         "-bf", "0",  # Disable b-frames for faster encoding
