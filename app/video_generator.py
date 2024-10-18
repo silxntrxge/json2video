@@ -29,6 +29,11 @@ import gc
 import psutil  # Make sure this line is present
 from fontTools.ttLib import TTFont
 import subprocess
+from moviepy.config import change_settings
+
+# Set the ImageMagick binary path
+magick_home = os.environ.get('MAGICK_HOME', '/usr')
+change_settings({"IMAGEMAGICK_BINARY": os.path.join(magick_home, "bin", "convert")})
 
 # Configure logging at the beginning of your script
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -455,6 +460,12 @@ def create_text_clip(element, video_width, video_height, total_duration):
         if duration is None:
             duration = total_duration - start_time
 
+        if DEBUG:
+            logging.info(f"Creating text clip with text: {text}")
+            logging.info(f"Font path: {font_path}")
+            logging.info(f"Font size: {font_size}")
+            logging.info(f"ImageMagick binary: {os.environ.get('IMAGEMAGICK_BINARY', 'Not set')}")
+
         text_clip = TextClip(
             txt=text,
             fontsize=font_size,
@@ -463,6 +474,9 @@ def create_text_clip(element, video_width, video_height, total_duration):
             method='label',
             transparent=True
         ).set_duration(duration)
+
+        if DEBUG:
+            logging.info(f"Text clip created with size: {text_clip.w}x{text_clip.h}")
 
         # Parse position (top-left based)
         x_percentage = element.get('x', "0%")
@@ -483,7 +497,7 @@ def create_text_clip(element, video_width, video_height, total_duration):
         final_clip.track = element.get('track', 0)
         return final_clip
     except Exception as e:
-        logging.error(f"Error creating text clip for element {element['id']}: {e}")
+        logging.error(f"Error creating text clip for element {element['id']}: {str(e)}", exc_info=True)
         return None
     finally:
         if font_url and font_url.startswith('http') and os.path.exists(font_path) and font_path != "Arial":
