@@ -606,10 +606,10 @@ def generate_video(json_data):
                     # Prepare FFmpeg parameters
                     ffmpeg_params = [
                         "-preset", "ultrafast",
-                        "-crf", "23",  # Increased CRF for even faster encoding (lower quality but faster)
+                        "-crf", "23",
                         "-tune", "fastdecode,zerolatency",
                         "-movflags", "+faststart",
-                        "-bf", "0",  # Disable b-frames for faster encoding
+                        "-bf", "0",
                         "-flags:v", "+global_header",
                         "-vf", "format=yuv420p",
                         "-maxrate", "4M",
@@ -617,20 +617,21 @@ def generate_video(json_data):
                         "-threads", str(num_cores)
                     ]
 
-                    # Add hardware acceleration parameters if available
+                    # Set codec based on hardware acceleration
+                    codec = "libx264"
                     if hw_accel:
                         if hw_accel == 'cuda':
-                            ffmpeg_params.extend(["-hwaccel", "cuda", "-c:v", "h264_nvenc"])
+                            codec = "h264_nvenc"
                         elif hw_accel == 'vaapi':
-                            ffmpeg_params.extend(["-hwaccel", "vaapi", "-vaapi_device", "/dev/dri/renderD128", "-c:v", "h264_vaapi"])
+                            codec = "h264_vaapi"
                         elif hw_accel == 'videotoolbox':
-                            ffmpeg_params.extend(["-hwaccel", "videotoolbox", "-c:v", "h264_videotoolbox"])
+                            codec = "h264_videotoolbox"
 
                     # Use write_videofile with further optimized settings
                     final_video.write_videofile(
                         temp_file.name,
                         fps=video_fps,
-                        codec="libx264" if not hw_accel else None,
+                        codec=codec,
                         audio_codec="aac",
                         temp_audiofile='temp-audio.m4a',
                         remove_temp=True,
@@ -656,7 +657,9 @@ def generate_video(json_data):
                     logging.info(f"Cleaned up temporary file: {temp_file_path}")
 
             except Exception as e:
-                logging.error(f"Error creating or writing the final video: {e}", exc_info=True)
+                logging.error(f"Error creating or writing the final video: {str(e)}", exc_info=True)
+                if os.path.exists(temp_file.name):
+                    os.unlink(temp_file.name)
                 return None
         else:
             logging.error("Error: No valid clips were created.")
@@ -666,13 +669,14 @@ def generate_video(json_data):
         logging.error("Out of memory error occurred. Try reducing video quality or duration.")
         return None
     except Exception as e:
-        logging.error(f"An unexpected error occurred during video generation: {e}", exc_info=True)
+        logging.error(f"An unexpected error occurred during video generation: {str(e)}", exc_info=True)
         return None
 
 def get_hardware_acceleration():
     try:
-        result = subprocess.run(['ffmpeg', '-hwaccels'], capture_output=True, text=True)
-        accelerators = result.stdout.strip().split('\n')[1:]  # Skip the first line which is just "Hardware acceleration methods:"
+        result = subprocess.run(['ffmpeg', '-hwaccels'], capture_output=True, text=True, timeout=5)
+        accelerators = result.stdout.strip().split('\n')[1:]  # Skip the first line
+        logging.info(f"Available hardware accelerators: {accelerators}")
         if 'cuda' in accelerators:
             return 'cuda'
         elif 'vaapi' in accelerators:
@@ -680,7 +684,11 @@ def get_hardware_acceleration():
         elif 'videotoolbox' in accelerators:
             return 'videotoolbox'
         else:
+            logging.info("No supported hardware acceleration found.")
             return None
+    except subprocess.TimeoutExpired:
+        logging.error("Timeout while checking for hardware acceleration.")
+        return None
     except Exception as e:
-        logging.error(f"Error checking for hardware acceleration: {e}")
+        logging.error(f"Error checking for hardware acceleration: {str(e)}")
         return None
