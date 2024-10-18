@@ -523,8 +523,10 @@ def create_clip(element, video_width, video_height, video_spec):
         return None
 
 
-def custom_logger(progress):
-    if progress == 0:
+def custom_logger(progress, message=None):
+    if message:
+        print(message)
+    elif progress == 0:
         print("Starting video generation...")
     elif progress % 30 == 0:
         print(f"Video generation progress: {progress}%")
