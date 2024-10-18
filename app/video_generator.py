@@ -483,14 +483,16 @@ def create_text_clip(element, video_width, video_height, total_duration):
             logging.info(f"Font size: {font_size}")
             logging.info(f"ImageMagick binary: {os.environ.get('IMAGEMAGICK_BINARY', 'Not set')}")
 
+        logging.info(f"Attempting to create TextClip with text: '{text}'")
         text_clip = TextClip(
             txt=text,
             fontsize=font_size,
             font=font_path,
             color=element.get('fill_color', 'white'),
-            method='label',  # Consider changing to 'caption' if issues persist
+            method='label',
             transparent=True
         ).set_duration(duration)
+        logging.info("TextClip created successfully")
 
         if DEBUG:
             logging.info(f"Text clip created with size: {text_clip.w}x{text_clip.h}")
@@ -515,6 +517,9 @@ def create_text_clip(element, video_width, video_height, total_duration):
         return final_clip
     except Exception as e:
         logging.error(f"Error creating text clip for element {element['id']}: {str(e)}", exc_info=True)
+        logging.error(f"Text content: '{text}'")
+        logging.error(f"Font path: {font_path}")
+        logging.error(f"Font size: {font_size}")
         return None
     finally:
         if font_url and font_url.startswith('http') and os.path.exists(font_path) and font_path != "Arial":

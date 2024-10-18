@@ -18,15 +18,8 @@ RUN apt-get update && apt-get install -y \
 # Set sticky bit on /tmp to allow secure deletion of files
 RUN chmod 1777 /tmp
 
-# Configure ImageMagick policy to allow various image operations, text operations, and increase memory limits
-RUN sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/rights="none" pattern="LABEL"/rights="read|write" pattern="LABEL"/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/<policy domain="coder" rights="none" pattern="PNG" \/>/<policy domain="coder" rights="read|write" pattern="PNG" \/>/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/<policy domain="coder" rights="none" pattern="GIF" \/>/<policy domain="coder" rights="read|write" pattern="GIF" \/>/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/<policy domain="coder" rights="none" pattern="PNG32" \/>/<policy domain="coder" rights="read|write" pattern="PNG32" \/>/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/<policy domain="path" rights="none" pattern="@\*" \/>/<policy domain="path" rights="read|write" pattern="@*" \/>/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/name="memory" value="256MiB"/name="memory" value="1GiB"/' /etc/ImageMagick-6/policy.xml && \
-    sed -i 's/name="disk" value="1GiB"/name="disk" value="4GiB"/' /etc/ImageMagick-6/policy.xml
+# Copy custom ImageMagick policy file
+COPY custom_policy.xml /etc/ImageMagick-6/policy.xml
 
 # Copy the current directory contents into the container at /app
 COPY . /app
