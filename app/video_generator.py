@@ -600,18 +600,42 @@ def generate_video(json_data):
                     # Get the number of CPU cores
                     num_cores = multiprocessing.cpu_count()
 
-                    # Use write_videofile with optimized settings
+                    # Check for hardware acceleration
+                    hw_accel = get_hardware_acceleration()
+
+                    # Prepare FFmpeg parameters
+                    ffmpeg_params = [
+                        "-preset", "ultrafast",
+                        "-crf", "30",  # Increased CRF for even faster encoding (lower quality but faster)
+                        "-tune", "fastdecode,zerolatency",
+                        "-movflags", "+faststart",
+                        "-bf", "0",  # Disable b-frames for faster encoding
+                        "-flags:v", "+global_header",
+                        "-vf", "format=yuv420p",
+                        "-maxrate", "4M",
+                        "-bufsize", "4M",
+                        "-threads", str(num_cores)
+                    ]
+
+                    # Add hardware acceleration parameters if available
+                    if hw_accel:
+                        if hw_accel == 'cuda':
+                            ffmpeg_params.extend(["-hwaccel", "cuda", "-c:v", "h264_nvenc"])
+                        elif hw_accel == 'vaapi':
+                            ffmpeg_params.extend(["-hwaccel", "vaapi", "-vaapi_device", "/dev/dri/renderD128", "-c:v", "h264_vaapi"])
+                        elif hw_accel == 'videotoolbox':
+                            ffmpeg_params.extend(["-hwaccel", "videotoolbox", "-c:v", "h264_videotoolbox"])
+
+                    # Use write_videofile with further optimized settings
                     final_video.write_videofile(
                         temp_file.name,
                         fps=video_fps,
-                        codec="libx264",
+                        codec="libx264" if not hw_accel else None,
                         audio_codec="aac",
                         temp_audiofile='temp-audio.m4a',
                         remove_temp=True,
                         logger='bar',
-                        threads=num_cores,  # Use all available CPU cores
-                        preset="ultrafast",  # Use the fastest preset to reduce CPU usage
-                        ffmpeg_params=["-crf", "23"]  # Balance between quality and file size
+                        ffmpeg_params=ffmpeg_params
                     )
                     temp_file_path = temp_file.name
                 
@@ -643,4 +667,20 @@ def generate_video(json_data):
         return None
     except Exception as e:
         logging.error(f"An unexpected error occurred during video generation: {e}", exc_info=True)
+        return None
+
+def get_hardware_acceleration():
+    try:
+        result = subprocess.run(['ffmpeg', '-hwaccels'], capture_output=True, text=True)
+        accelerators = result.stdout.strip().split('\n')[1:]  # Skip the first line which is just "Hardware acceleration methods:"
+        if 'cuda' in accelerators:
+            return 'cuda'
+        elif 'vaapi' in accelerators:
+            return 'vaapi'
+        elif 'videotoolbox' in accelerators:
+            return 'videotoolbox'
+        else:
+            return None
+    except Exception as e:
+        logging.error(f"Error checking for hardware acceleration: {e}")
         return None
